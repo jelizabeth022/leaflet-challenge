@@ -1,63 +1,70 @@
-// Create the map centered at a reasonable location
-let map = L.map("map").setView([20, 0], 2);
+// Create the map
+let myMap = L.map("map").setView([37.09, -95.71], 5);
 
-// Add a tile layer (Base map)
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+// Add base layers
+let street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap contributors"
-}).addTo(map);
+}).addTo(myMap);
 
-// Define the USGS earthquake data URL
-const earthquakeUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
-
-// Fetch data and plot markers
-d3.json(earthquakeUrl).then(data => {
-    L.geoJSON(data, {
-        pointToLayer: function(feature, latlng) {
-            let magnitude = feature.properties.mag;
-            let depth = feature.geometry.coordinates[2];
-
-            // Set marker style
-            let markerOptions = {
-                radius: magnitude * 5,
-                fillColor: getColor(depth),
-                color: "#000",
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.7
-            };
-
-            return L.circleMarker(latlng, markerOptions).bindPopup(
-                `<strong>Magnitude:</strong> ${magnitude}<br>
-                <strong>Depth:</strong> ${depth} km<br>
-                <strong>Location:</strong> ${feature.properties.place}`
-            );
-        }
-    }).addTo(map);
-});
-
-// Function to determine color based on depth
-function getColor(depth) {
-    return depth > 90 ? "#d73027" :
-           depth > 70 ? "#fc8d59" :
-           depth > 50 ? "#fee08b" :
-           depth > 30 ? "#d9ef8b" :
-           depth > 10 ? "#91cf60" :
-                        "#1a9850";
+// Function to determine marker size based on magnitude
+function getRadius(magnitude) {
+    return magnitude ? magnitude * 4 : 1;
 }
 
-// Add legend control
+// Function to determine marker color based on depth
+function getColor(depth) {
+    return depth > 90 ? "#ff0000" :  // Red
+           depth > 70 ? "#ff6600" :  // Orange-Red
+           depth > 50 ? "#ffcc00" :  // Orange-Yellow
+           depth > 30 ? "#ccff33" :  // Yellow-Green
+           depth > 10 ? "#33ff33" :  // Green
+                        "#00ff99";   // Light Green
+
+}
+
+// Function to style each marker
+function styleInfo(feature) {
+    return {
+        radius: getRadius(feature.properties.mag),
+        fillColor: getColor(feature.geometry.coordinates[2]), // Depth determines color
+        color: "#ffffff",  // White border
+        weight: 1.5,       // Thickness of the border
+        opacity: 1,
+        fillOpacity: 0.8
+    };
+}
+
+// Load earthquake data from USGS GeoJSON
+d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson").then(function(data) {
+    L.geoJSON(data, {
+        pointToLayer: function(feature, latlng) {
+            return L.circleMarker(latlng, styleInfo(feature));
+        },
+        onEachFeature: function(feature, layer) {
+            layer.bindPopup(`<strong>Magnitude:</strong> ${feature.properties.mag}<br>
+                            <strong>Depth:</strong> ${feature.geometry.coordinates[2]} km<br>
+                            <strong>Location:</strong> ${feature.properties.place}`);
+        }
+    }).addTo(myMap);
+});
+
+// Add legend for depth colors
 let legend = L.control({ position: "bottomright" });
 
-legend.onAdd = function(map) {
+legend.onAdd = function () {
     let div = L.DomUtil.create("div", "info legend"),
         depths = [-10, 10, 30, 50, 70, 90],
-        labels = [];
+        colors = ["#00ff99", "#33ff33", "#ccff33", "#ffcc00", "#ff6600", "#ff0000"];
 
+    // Loop through depth values and generate labels
     for (let i = 0; i < depths.length; i++) {
-        div.innerHTML += `<i style="background:${getColor(depths[i] + 1)}"></i> 
-                          ${depths[i]}${depths[i + 1] ? "&ndash;" + depths[i + 1] + "<br>" : "+"}`;
+        div.innerHTML +=
+            `<i style="background:${colors[i]}; width: 20px; height: 20px; display: inline-block; border: 1px solid #000;"></i> ` +
+            depths[i] + (depths[i + 1] ? "&ndash;" + depths[i + 1] + "<br>" : "+");
     }
     return div;
 };
 
-legend.addTo(map);
+// Add legend to the map
+legend.addTo(myMap);
+
